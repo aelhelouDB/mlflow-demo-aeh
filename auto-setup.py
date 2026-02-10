@@ -1985,6 +1985,12 @@ def main():
   if args.validate_only:
     # Only run validation
     print('🔍 Running validation checks only...')
+
+    # Initialize Databricks components for validation
+    if not auto_setup._initialize_databricks_components(skip_auth_prompts=True):
+      print('❌ Failed to initialize Databricks components for validation')
+      sys.exit(1)
+
     valid, issues = auto_setup.validator.validate_prerequisites()
     if valid:
       print('✅ All validation checks passed')
