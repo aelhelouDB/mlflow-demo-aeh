@@ -1360,11 +1360,13 @@ class AutoSetup:
           catalog_name, service_principal, permissions=['USE CATALOG']
         )
 
-        # Grant schema permissions (ALL PERMISSIONS + MANAGE)
+        # Grant schema permissions for prompt lifecycle management
         schema_name = f'{self.config["UC_CATALOG"]}.{self.config["UC_SCHEMA"]}'
         print(f'🔐 Granting schema permissions on {schema_name}...')
         self.resource_manager.grant_schema_permissions(
-          schema_name, service_principal, permissions=['ALL_PRIVILEGES', 'MANAGE']
+          schema_name,
+          service_principal,
+          permissions=['USE_SCHEMA', 'CREATE_FUNCTION', 'MANAGE', 'EXECUTE'],
         )
 
         # Grant experiment permissions (CAN MANAGE)
