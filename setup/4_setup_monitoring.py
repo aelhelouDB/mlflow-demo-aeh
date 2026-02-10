@@ -27,28 +27,37 @@ logging.getLogger("urllib3").setLevel(logging.ERROR)
 logging.getLogger("mlflow").setLevel(logging.ERROR)
 
 
-# These packages are automatically installed with mlflow[databricks]
-from databricks.agents.monitoring import (
-  create_external_monitor,
-)
+import mlflow
+from mlflow.entities import UCSchemaLocation
+from mlflow.tracing import set_databricks_monitoring_sql_warehouse_id
 
 
 # Unity Catalog schema to store the prompt in
 UC_CATALOG = os.environ.get('UC_CATALOG')
 UC_SCHEMA = os.environ.get('UC_SCHEMA')
+SQL_WAREHOUSE_ID = os.environ.get('SQL_WAREHOUSE_ID')
+MLFLOW_EXPERIMENT_ID = os.environ.get('MLFLOW_EXPERIMENT_ID')
 # Exit if required environment variables are not set
 if not UC_CATALOG or not UC_SCHEMA:
   print('Error: UC_CATALOG and UC_SCHEMA environment variables must be set')
   sys.exit(1)
 
+# Set tracing destination to UC so scorers can write to UC tables
+mlflow.set_tracking_uri('databricks')
+mlflow.tracing.set_destination(
+  destination=UCSchemaLocation(catalog_name=UC_CATALOG, schema_name=UC_SCHEMA)
+)
+print(f'✅ Tracing destination set to UC: {UC_CATALOG}.{UC_SCHEMA}')
 
-# # Enable sync of traces to a delta table
-# external_monitor = create_external_monitor(
-#   # Change to a Unity Catalog schema where you have CREATE TABLE permissions.
-#   catalog_name=UC_CATALOG,
-#   schema_name=UC_SCHEMA,
-#   assessments_config={},
-# )
+# Enable production monitoring with SQL warehouse
+if SQL_WAREHOUSE_ID and MLFLOW_EXPERIMENT_ID:
+  set_databricks_monitoring_sql_warehouse_id(
+    warehouse_id=SQL_WAREHOUSE_ID,
+    experiment_id=MLFLOW_EXPERIMENT_ID,
+  )
+  print(f'✅ Production monitoring enabled with SQL warehouse: {SQL_WAREHOUSE_ID}')
+else:
+  print('⚠️  SQL_WAREHOUSE_ID or MLFLOW_EXPERIMENT_ID not set, skipping monitoring setup')
 
 for scorer in SCORERS:
   # Register each scorer with MLflow

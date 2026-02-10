@@ -694,6 +694,86 @@ class AutoSetup:
       except KeyboardInterrupt:
         return suggested_model or available_models[0]
 
+  def _get_available_sql_warehouses(self) -> List[Dict[str, Any]]:
+    """Get list of available SQL warehouses from Databricks."""
+    try:
+      spinner = Spinner('Discovering available SQL warehouses...')
+      spinner.start()
+      try:
+        warehouses = list(self.client.warehouses.list())
+        spinner.stop('Found SQL warehouses')
+      except Exception as e:
+        spinner.stop()
+        raise e
+
+      available = []
+      for wh in warehouses:
+        status = getattr(wh, 'state', 'UNKNOWN')
+        available.append(
+          {
+            'id': wh.id,
+            'name': wh.name,
+            'status': str(status),
+            'size': getattr(wh, 'cluster_size', 'Unknown'),
+          }
+        )
+
+      return available
+
+    except Exception as e:
+      print(f'⚠️  Could not discover SQL warehouses: {e}')
+      return []
+
+  def _prompt_for_sql_warehouse(self) -> str:
+    """Interactive SQL warehouse selection for production monitoring."""
+    print('\n📊 SQL Warehouse Selection (for production monitoring)')
+    print('   A SQL warehouse is needed so monitoring scorers can query UC trace tables.')
+
+    available_warehouses = self._get_available_sql_warehouses()
+
+    if not available_warehouses:
+      print('❌ No SQL warehouses found.')
+      warehouse_id = input('Enter SQL warehouse ID manually (or press Enter to skip): ').strip()
+      return warehouse_id
+
+    print('Available SQL warehouses:')
+    for i, wh in enumerate(available_warehouses):
+      status_indicator = '✅' if 'RUNNING' in wh['status'] else '⏸️'
+      print(f'   {i}. {wh["name"]} ({wh["size"]}) - {status_indicator} {wh["status"]}')
+
+    manual_entry_idx = len(available_warehouses)
+    print(f'   {manual_entry_idx}. Enter warehouse ID manually')
+
+    while True:
+      try:
+        choice = input(
+          f'\nSelect SQL warehouse (0-{manual_entry_idx}) or press ENTER for first: '
+        ).strip()
+
+        if not choice:
+          selected = available_warehouses[0]
+          print(f'✅ Selected warehouse: {selected["name"]} ({selected["id"]})')
+          return selected['id']
+
+        try:
+          choice_num = int(choice)
+          if choice_num == manual_entry_idx:
+            warehouse_id = input('Enter SQL warehouse ID: ').strip()
+            return warehouse_id
+          elif 0 <= choice_num < len(available_warehouses):
+            selected = available_warehouses[choice_num]
+            print(f'✅ Selected warehouse: {selected["name"]} ({selected["id"]})')
+            return selected['id']
+          else:
+            print(f'❌ Please enter a number between 0 and {manual_entry_idx}')
+            continue
+        except ValueError:
+          print('❌ Please enter a valid number')
+          continue
+
+      except KeyboardInterrupt:
+        return ''
+
   def _generate_default_app_name(self) -> str:
     """Generate a default app name with 4 random characters."""
     import os
@@ -764,6 +844,7 @@ class AutoSetup:
           'DEPLOYMENT_MODE': 'DEPLOYMENT_MODE',
           'MLFLOW_EXPERIMENT_ID': 'MLFLOW_EXPERIMENT_ID',
           'LHA_SOURCE_CODE_PATH': 'LHA_SOURCE_CODE_PATH',
+          'SQL_WAREHOUSE_ID': 'SQL_WAREHOUSE_ID',
         }
 
         loaded_keys = []
@@ -956,6 +1037,7 @@ class AutoSetup:
         'DATABRICKS_APP_NAME': 'mlflow_demo_app',
         'MLFLOW_EXPERIMENT_ID': '123456789',
         'DEPLOYMENT_MODE': 'notebook_only',  # Default to notebook-only for dry run
+        'SQL_WAREHOUSE_ID': 'dummy-warehouse-id',
       }
       return True
 
@@ -1005,6 +1087,9 @@ class AutoSetup:
     # LLM model selection
     llm_model = self._prompt_for_llm_model('databricks-claude-3-7-sonnet')
 
+    # SQL warehouse selection for production monitoring
+    sql_warehouse_id = self._prompt_for_sql_warehouse()
+
     # Store configuration
     self.config = {
       'DATABRICKS_HOST': workspace_url,
@@ -1013,6 +1098,7 @@ class AutoSetup:
       'DATABRICKS_APP_NAME': app_name,
       'LLM_MODEL': llm_model,
       'DEPLOYMENT_MODE': deployment_mode,
+      'SQL_WAREHOUSE_ID': sql_warehouse_id,
     }
 
     return True
@@ -1111,6 +1197,11 @@ class AutoSetup:
     llm_model = self.config.get('LLM_MODEL', 'Unknown')
     print(f'🤖 LLM Model: {llm_model}')
 
+    # SQL Warehouse
+    sql_warehouse_id = self.config.get('SQL_WAREHOUSE_ID')
+    if sql_warehouse_id:
+      print(f'📊 SQL Warehouse: {sql_warehouse_id} (for production monitoring)')
+
     # Sample data
     print('\n📊 Sample Data Setup:')
     print('   • Load prompt templates into MLflow')
@@ -1168,6 +1259,7 @@ class AutoSetup:
         'DATABRICKS_APP_NAME',
         'LLM_MODEL',
         'DEPLOYMENT_MODE',
+        'SQL_WAREHOUSE_ID',
         'CUSTOM_EXPERIMENT_PATH',
       ]:
         print(f'   {key}: {value}')
@@ -1282,6 +1374,17 @@ class AutoSetup:
       self.config['MLFLOW_EXPERIMENT_ID'] = experiment_id
       self.created_resources['experiment_id'] = experiment_id
 
+      # Set experiment trace location to Unity Catalog
+      catalog = self.config.get('UC_CATALOG')
+      schema = self.config.get('UC_SCHEMA')
+      if catalog and schema:
+        self.resource_manager.set_experiment_trace_uc_destination(experiment_id, catalog, schema)
+
+      # Enable production monitoring with SQL warehouse
+      sql_warehouse_id = self.config.get('SQL_WAREHOUSE_ID')
+      if sql_warehouse_id:
+        self.resource_manager.enable_production_monitoring(experiment_id, sql_warehouse_id)
+
       return True
     except Exception as e:
       print(f'❌ Failed to create experiment: {e}')
@@ -1360,13 +1463,20 @@ class AutoSetup:
           catalog_name, service_principal, permissions=['USE CATALOG']
         )
 
-        # Grant schema permissions for prompt lifecycle management
+        # Grant schema permissions for prompt lifecycle management and UC trace tables
         schema_name = f'{self.config["UC_CATALOG"]}.{self.config["UC_SCHEMA"]}'
         print(f'🔐 Granting schema permissions on {schema_name}...')
         self.resource_manager.grant_schema_permissions(
           schema_name,
           service_principal,
-          permissions=['USE_SCHEMA', 'CREATE_FUNCTION', 'MANAGE', 'EXECUTE'],
+          permissions=[
+            'USE_SCHEMA',
+            'CREATE_FUNCTION',
+            'MANAGE',
+            'EXECUTE',
+            'SELECT',
+            'MODIFY',
+          ],
         )
 
         # Grant experiment permissions (CAN MANAGE)

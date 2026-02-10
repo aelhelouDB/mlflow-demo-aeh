@@ -95,6 +95,7 @@ if [[ $REPLY != "3" ]]; then
         MLFLOW_EXPERIMENT_ID=$(prompt_with_existing "MLFLOW_EXPERIMENT_ID" "MLFLOW_EXPERIMENT_ID")
         UC_CATALOG=$(prompt_with_existing "UC_CATALOG" "UC_CATALOG")
         UC_SCHEMA=$(prompt_with_existing "UC_SCHEMA" "UC_SCHEMA")
+        SQL_WAREHOUSE_ID=$(prompt_with_existing "SQL_WAREHOUSE_ID" "SQL_WAREHOUSE_ID (SQL warehouse for production monitoring)")
 
         # Optional variables
         echo ""
@@ -108,6 +109,7 @@ if [[ $REPLY != "3" ]]; then
         read -p "MLFLOW_EXPERIMENT_ID (MLflow experiment ID): " MLFLOW_EXPERIMENT_ID
         read -p "UC_CATALOG (Unity Catalog name in which you have a schema with EDIT permissions): " UC_CATALOG
         read -p "UC_SCHEMA (Unity Catalog schema name where you have EDIT permissions): " UC_SCHEMA
+        read -p "SQL_WAREHOUSE_ID (SQL warehouse ID for production monitoring): " SQL_WAREHOUSE_ID
 
         # Optional variables
         echo ""
@@ -131,6 +133,7 @@ LHA_SOURCE_CODE_PATH="$LHA_SOURCE_CODE_PATH"
 MLFLOW_EXPERIMENT_ID="$MLFLOW_EXPERIMENT_ID"
 UC_CATALOG="$UC_CATALOG"
 UC_SCHEMA="$UC_SCHEMA"
+SQL_WAREHOUSE_ID="$SQL_WAREHOUSE_ID"
 EOF
 
     # Add optional variables if provided
@@ -160,6 +163,7 @@ EOF
     echo "  MLFLOW_EXPERIMENT_ID: $MLFLOW_EXPERIMENT_ID"
     echo "  UC_CATALOG: $UC_CATALOG"
     echo "  UC_SCHEMA: $UC_SCHEMA"
+    echo "  SQL_WAREHOUSE_ID: $SQL_WAREHOUSE_ID"
     if [ ! -z "$LLM_MODEL" ]; then
         echo "  LLM_MODEL: $LLM_MODEL"
     else

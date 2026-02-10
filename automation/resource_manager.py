@@ -148,6 +148,76 @@ class DatabricksResourceManager:
       print(f"❌ Failed to create MLflow experiment '{name}': {e}")
       raise
 
+  def set_experiment_trace_uc_destination(
+    self, experiment_id: str, catalog_name: str, schema_name: str
+  ) -> None:
+    """Set the experiment trace location to Unity Catalog tables.
+
+    This creates 3 UC tables and links them to the experiment for
+    queryable, persistent trace storage.
+
+    Args:
+        experiment_id: MLflow experiment ID
+        catalog_name: Unity Catalog catalog name
+        schema_name: Unity Catalog schema name
+    """
+    try:
+      print(
+        f'📊 Setting experiment trace location to UC: {catalog_name}.{schema_name} '
+        f'(experiment {experiment_id})...'
+      )
+
+      mlflow.set_tracking_uri('databricks')
+
+      from mlflow.entities import UCSchemaLocation
+
+      mlflow.set_experiment_trace_location(
+        location=UCSchemaLocation(catalog_name=catalog_name, schema_name=schema_name),
+        experiment_id=experiment_id,
+      )
+
+      print(
+        f'✅ Experiment trace location set to UC: {catalog_name}.{schema_name} '
+        f'(3 UC tables created/linked)'
+      )
+
+    except Exception as e:
+      print(f'⚠️  Failed to set experiment trace UC destination: {e}')
+      print('   You may need to configure this manually.')
+      print('   See: https://docs.databricks.com/aws/en/mlflow3/genai/tracing/trace-unity-catalog')
+
+  def enable_production_monitoring(self, experiment_id: str, warehouse_id: str) -> None:
+    """Enable production monitoring by setting the SQL warehouse for scorer queries.
+
+    Args:
+        experiment_id: MLflow experiment ID
+        warehouse_id: SQL warehouse ID for monitoring scorer queries
+    """
+    try:
+      print(
+        f'📊 Enabling production monitoring (warehouse: {warehouse_id}, '
+        f'experiment: {experiment_id})...'
+      )
+
+      mlflow.set_tracking_uri('databricks')
+
+      from mlflow.tracing import set_databricks_monitoring_sql_warehouse_id
+
+      set_databricks_monitoring_sql_warehouse_id(
+        warehouse_id=warehouse_id,
+        experiment_id=experiment_id,
+      )
+
+      print('✅ Production monitoring enabled with SQL warehouse')
+
+    except Exception as e:
+      print(f'⚠️  Failed to enable production monitoring: {e}')
+      print('   You may need to configure this manually.')
+      print(
+        '   See: https://docs.databricks.com/aws/en/mlflow3/genai/tracing/'
+        'trace-unity-catalog#enable-production-monitoring'
+      )
+
   def create_databricks_app(
     self, name: str, description: str = None, source_code_path: str = None
   ) -> App:

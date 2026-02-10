@@ -121,6 +121,20 @@ if [ -n "$MLFLOW_ENABLE_ASYNC_TRACE_LOGGING" ]; then
   rm -f app.yaml.bak
 fi
 
+# Compute MLFLOW_TRACING_DESTINATION from UC_CATALOG and UC_SCHEMA
+if [ -n "$UC_CATALOG" ] && [ -n "$UC_SCHEMA" ]; then
+  MLFLOW_TRACING_DESTINATION="${UC_CATALOG}.${UC_SCHEMA}"
+  echo "🔧 Setting MLFLOW_TRACING_DESTINATION to $MLFLOW_TRACING_DESTINATION in app.yaml..."
+  sed -i.bak "s/value: 'placeholder-tracing-destination'/value: '$MLFLOW_TRACING_DESTINATION'/" app.yaml
+  rm -f app.yaml.bak
+fi
+
+if [ -n "$SQL_WAREHOUSE_ID" ]; then
+  echo "🔧 Setting SQL_WAREHOUSE_ID to $SQL_WAREHOUSE_ID in app.yaml..."
+  sed -i.bak "s/value: 'placeholder-sql-warehouse-id'/value: '$SQL_WAREHOUSE_ID'/" app.yaml
+  rm -f app.yaml.bak
+fi
+
 if [ -n "$PROMPT_NAME" ]; then
   echo "🔧 Setting PROMPT_NAME to $PROMPT_NAME in app.yaml..."
   sed -i.bak "s/value: 'placeholder-prompt-name'/value: '$PROMPT_NAME'/" app.yaml

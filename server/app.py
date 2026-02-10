@@ -36,6 +36,17 @@ async def lifespan(app: FastAPI):
   # Startup
   logger.info('Starting application...')
 
+  # Set tracing destination to Unity Catalog if configured
+  uc_catalog = os.getenv('UC_CATALOG')
+  uc_schema = os.getenv('UC_SCHEMA')
+  if uc_catalog and uc_schema:
+    from mlflow.entities import UCSchemaLocation
+
+    mlflow.tracing.set_destination(
+      destination=UCSchemaLocation(catalog_name=uc_catalog, schema_name=uc_schema)
+    )
+    logger.info(f'Tracing destination set to UC: {uc_catalog}.{uc_schema}')
+
   logger.info('Application startup complete')
 
   yield
