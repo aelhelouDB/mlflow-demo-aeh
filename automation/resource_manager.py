@@ -170,8 +170,9 @@ class DatabricksResourceManager:
       mlflow.set_tracking_uri('databricks')
 
       from mlflow.entities import UCSchemaLocation
+      from mlflow.tracing.enablement import set_experiment_trace_location
 
-      mlflow.set_experiment_trace_location(
+      set_experiment_trace_location(
         location=UCSchemaLocation(catalog_name=catalog_name, schema_name=schema_name),
         experiment_id=experiment_id,
       )
