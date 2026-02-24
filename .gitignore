@@ -14,6 +14,12 @@ mlruns
 # OS files
 .DS_Store
 
+# Editor / IDE / tooling
+.ai-dev-kit/
+.claude/
+.cursor/
+.mcp.json
+
 # Frontend dependencies and build outputs
 client/node_modules/
 client/dist/
