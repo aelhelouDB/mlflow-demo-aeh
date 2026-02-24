@@ -14,6 +14,11 @@ dotenv.load_dotenv(project_root / '.env.local')
 import os
 os.environ.pop('DATABRICKS_HOST', None)
 
+# MLflow requires MLFLOW_TRACING_SQL_WAREHOUSE_ID when writing traces to UC-backed experiments.
+# Bridge from SQL_WAREHOUSE_ID if not explicitly set.
+if not os.environ.get('MLFLOW_TRACING_SQL_WAREHOUSE_ID') and os.environ.get('SQL_WAREHOUSE_ID'):
+  os.environ['MLFLOW_TRACING_SQL_WAREHOUSE_ID'] = os.environ['SQL_WAREHOUSE_ID']
+
 
 
 from mlflow_demo.evaluation.evaluator import SCORERS
@@ -52,7 +57,7 @@ print(f'✅ Tracing destination set to UC: {UC_CATALOG}.{UC_SCHEMA}')
 # Enable production monitoring with SQL warehouse
 if SQL_WAREHOUSE_ID and MLFLOW_EXPERIMENT_ID:
   set_databricks_monitoring_sql_warehouse_id(
-    warehouse_id=SQL_WAREHOUSE_ID,
+    sql_warehouse_id=SQL_WAREHOUSE_ID,
     experiment_id=MLFLOW_EXPERIMENT_ID,
   )
   print(f'✅ Production monitoring enabled with SQL warehouse: {SQL_WAREHOUSE_ID}')

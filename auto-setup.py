@@ -1099,6 +1099,7 @@ class AutoSetup:
       'LLM_MODEL': llm_model,
       'DEPLOYMENT_MODE': deployment_mode,
       'SQL_WAREHOUSE_ID': sql_warehouse_id,
+      'MLFLOW_TRACING_SQL_WAREHOUSE_ID': sql_warehouse_id,
     }
 
     return True
