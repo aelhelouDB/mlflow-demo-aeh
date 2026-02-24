@@ -18,6 +18,9 @@ dotenv.load_dotenv(project_root / '.env.local')
 # allow databricks-cli auth to take over
 os.environ.pop('DATABRICKS_HOST', None)
 
+# Disable async trace logging so traces are committed synchronously before we search them.
+os.environ['MLFLOW_ENABLE_ASYNC_TRACE_LOGGING'] = 'false'
+
 # MLflow requires MLFLOW_TRACING_SQL_WAREHOUSE_ID when writing traces to UC-backed experiments.
 # Bridge from SQL_WAREHOUSE_ID if not explicitly set.
 if not os.environ.get('MLFLOW_TRACING_SQL_WAREHOUSE_ID') and os.environ.get('SQL_WAREHOUSE_ID'):
@@ -27,6 +30,9 @@ import logging
 logging.getLogger("urllib3").setLevel(logging.ERROR)
 logging.getLogger("mlflow").setLevel(logging.ERROR)
 
+from mlflow.entities import UCSchemaLocation
+from mlflow.tracing import set_databricks_monitoring_sql_warehouse_id
+
 from mlflow_demo.agent.email_generator import EmailGenerator
 
 PROMPT_NAME = os.getenv('PROMPT_NAME')
@@ -35,6 +41,22 @@ if not PROMPT_NAME or not PROMPT_ALIAS:
   raise Exception('PROMPT_NAME and PROMPT_ALIAS environment variables must be set')
 UC_CATALOG = os.environ.get('UC_CATALOG')
 UC_SCHEMA = os.environ.get('UC_SCHEMA')
+SQL_WAREHOUSE_ID = os.environ.get('SQL_WAREHOUSE_ID')
+MLFLOW_EXPERIMENT_ID = os.environ.get('MLFLOW_EXPERIMENT_ID')
+
+# Configure MLflow for UC-backed tracing
+mlflow.set_tracking_uri('databricks')
+if UC_CATALOG and UC_SCHEMA:
+  mlflow.tracing.set_destination(
+    destination=UCSchemaLocation(catalog_name=UC_CATALOG, schema_name=UC_SCHEMA)
+  )
+
+# Enable production monitoring with SQL warehouse
+if SQL_WAREHOUSE_ID and MLFLOW_EXPERIMENT_ID:
+  set_databricks_monitoring_sql_warehouse_id(
+    sql_warehouse_id=SQL_WAREHOUSE_ID,
+    experiment_id=MLFLOW_EXPERIMENT_ID,
+  )
 
 
 def write_env_variable(key, value):
@@ -151,7 +173,22 @@ def process_input_data(input_file='input_data.jsonl', max_workers=5, max_records
 
 
 def save_trace_id_sample():
-  traces = mlflow.search_traces(max_results=1, return_type='list')
+  import time
+
+  # UC-backed experiments may take a moment to index traces; retry a few times.
+  traces = []
+  for attempt in range(6):
+    traces = mlflow.search_traces(max_results=1, return_type='list')
+    if traces:
+      break
+    wait = 5 * (attempt + 1)
+    print(f'No traces found yet, retrying in {wait}s... (attempt {attempt + 1}/6)')
+    time.sleep(wait)
+
+  if not traces:
+    print('⚠️  No traces found after retries — skipping trace ID sample save.')
+    return
+
   trace_id = traces[0].info.trace_id
   mlflow.log_feedback(
     trace_id=trace_id,
