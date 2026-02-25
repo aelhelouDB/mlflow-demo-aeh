@@ -654,9 +654,11 @@ class AutoSetup:
       start_idx = 0
 
     # Show other models
-    for i, model_name in enumerate(available_models):
+    display_idx = start_idx
+    for model_name in available_models:
       if model_name != suggested_model:
-        print(f'   {start_idx + i}. {model_name}')
+        print(f'   {display_idx}. {model_name}')
+        display_idx += 1
 
     max_choice = len(available_models) - 1 + (1 if suggested_model in available_models else 0)
 
