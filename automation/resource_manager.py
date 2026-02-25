@@ -205,7 +205,7 @@ class DatabricksResourceManager:
       from mlflow.tracing import set_databricks_monitoring_sql_warehouse_id
 
       set_databricks_monitoring_sql_warehouse_id(
-        warehouse_id=warehouse_id,
+        sql_warehouse_id=warehouse_id,
         experiment_id=experiment_id,
       )
 
@@ -370,6 +370,8 @@ class DatabricksResourceManager:
 
       # Map permission strings to Privilege enum values
       privilege_map = {
+        'ALL_PRIVILEGES': Privilege.ALL_PRIVILEGES,
+        'ALL PRIVILEGES': Privilege.ALL_PRIVILEGES,
         'USE CATALOG': Privilege.USE_CATALOG,
         'USE_CATALOG': Privilege.USE_CATALOG,
         'BROWSE': Privilege.BROWSE,

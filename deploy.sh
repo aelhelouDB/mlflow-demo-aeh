@@ -62,7 +62,7 @@ cp app.yaml.template app.yaml
 # Update app.yaml with MLFLOW_EXPERIMENT_ID from .env.local
 if [ -n "$MLFLOW_EXPERIMENT_ID" ]; then
   echo "🔧 Setting MLFLOW_EXPERIMENT_ID to $MLFLOW_EXPERIMENT_ID in app.yaml..."
-  sed -i.bak "s/value: 'your-experiment-id'/value: '$MLFLOW_EXPERIMENT_ID'/" app.yaml
+  sed -i.bak "s|value: 'your-experiment-id'|value: '$MLFLOW_EXPERIMENT_ID'|" app.yaml
   rm -f app.yaml.bak
 else
   echo "⚠️  MLFLOW_EXPERIMENT_ID not found in environment"
@@ -99,25 +99,25 @@ fi
 
 if [ -n "$LLM_MODEL" ]; then
   echo "🔧 Setting LLM_MODEL to $LLM_MODEL in app.yaml..."
-  sed -i.bak "s/value: 'placeholder-llm-model'/value: '$LLM_MODEL'/" app.yaml
+  sed -i.bak "s|value: 'placeholder-llm-model'|value: '$LLM_MODEL'|" app.yaml
   rm -f app.yaml.bak
 fi
 
 if [ -n "$UC_CATALOG" ]; then
   echo "🔧 Setting UC_CATALOG to $UC_CATALOG in app.yaml..."
-  sed -i.bak "s/value: 'placeholder-uc-catalog'/value: '$UC_CATALOG'/" app.yaml
+  sed -i.bak "s|value: 'placeholder-uc-catalog'|value: '$UC_CATALOG'|" app.yaml
   rm -f app.yaml.bak
 fi
 
 if [ -n "$UC_SCHEMA" ]; then
   echo "🔧 Setting UC_SCHEMA to $UC_SCHEMA in app.yaml..."
-  sed -i.bak "s/value: 'placeholder-uc-schema'/value: '$UC_SCHEMA'/" app.yaml
+  sed -i.bak "s|value: 'placeholder-uc-schema'|value: '$UC_SCHEMA'|" app.yaml
   rm -f app.yaml.bak
 fi
 
 if [ -n "$MLFLOW_ENABLE_ASYNC_TRACE_LOGGING" ]; then
   echo "🔧 Setting MLFLOW_ENABLE_ASYNC_TRACE_LOGGING to $MLFLOW_ENABLE_ASYNC_TRACE_LOGGING in app.yaml..."
-  sed -i.bak "s/value: 'placeholder-async-logging'/value: '$MLFLOW_ENABLE_ASYNC_TRACE_LOGGING'/" app.yaml
+  sed -i.bak "s|value: 'placeholder-async-logging'|value: '$MLFLOW_ENABLE_ASYNC_TRACE_LOGGING'|" app.yaml
   rm -f app.yaml.bak
 fi
 
@@ -125,25 +125,25 @@ fi
 if [ -n "$UC_CATALOG" ] && [ -n "$UC_SCHEMA" ]; then
   MLFLOW_TRACING_DESTINATION="${UC_CATALOG}.${UC_SCHEMA}"
   echo "🔧 Setting MLFLOW_TRACING_DESTINATION to $MLFLOW_TRACING_DESTINATION in app.yaml..."
-  sed -i.bak "s/value: 'placeholder-tracing-destination'/value: '$MLFLOW_TRACING_DESTINATION'/" app.yaml
+  sed -i.bak "s|value: 'placeholder-tracing-destination'|value: '$MLFLOW_TRACING_DESTINATION'|" app.yaml
   rm -f app.yaml.bak
 fi
 
 if [ -n "$SQL_WAREHOUSE_ID" ]; then
   echo "🔧 Setting SQL_WAREHOUSE_ID to $SQL_WAREHOUSE_ID in app.yaml..."
-  sed -i.bak "s/value: 'placeholder-sql-warehouse-id'/value: '$SQL_WAREHOUSE_ID'/" app.yaml
+  sed -i.bak "s|value: 'placeholder-sql-warehouse-id'|value: '$SQL_WAREHOUSE_ID'|" app.yaml
   rm -f app.yaml.bak
 fi
 
 if [ -n "$PROMPT_NAME" ]; then
   echo "🔧 Setting PROMPT_NAME to $PROMPT_NAME in app.yaml..."
-  sed -i.bak "s/value: 'placeholder-prompt-name'/value: '$PROMPT_NAME'/" app.yaml
+  sed -i.bak "s|value: 'placeholder-prompt-name'|value: '$PROMPT_NAME'|" app.yaml
   rm -f app.yaml.bak
 fi
 
 if [ -n "$SAMPLE_LABELING_SESSION_ID" ]; then
   echo "🔧 Setting SAMPLE_LABELING_SESSION_ID to $SAMPLE_LABELING_SESSION_ID in app.yaml..."
-  sed -i.bak "s/value: 'placeholder-sample-labeling-session-id'/value: '$SAMPLE_LABELING_SESSION_ID'/" app.yaml
+  sed -i.bak "s|value: 'placeholder-sample-labeling-session-id'|value: '$SAMPLE_LABELING_SESSION_ID'|" app.yaml
   rm -f app.yaml.bak
 fi
 
@@ -156,31 +156,31 @@ fi
 
 if [ -n "$SAMPLE_LABELING_TRACE_ID" ]; then
   echo "🔧 Setting SAMPLE_LABELING_TRACE_ID to $SAMPLE_LABELING_TRACE_ID in app.yaml..."
-  sed -i.bak "s/value: 'placeholder-sample-labeling-trace-id'/value: '$SAMPLE_LABELING_TRACE_ID'/" app.yaml
+  sed -i.bak "s|value: 'placeholder-sample-labeling-trace-id'|value: '$SAMPLE_LABELING_TRACE_ID'|" app.yaml
   rm -f app.yaml.bak
 fi
 
 if [ -n "$SAMPLE_TRACE_ID" ]; then
   echo "🔧 Setting SAMPLE_TRACE_ID to $SAMPLE_TRACE_ID in app.yaml..."
-  sed -i.bak "s/value: 'placeholder-sample-trace-id'/value: '$SAMPLE_TRACE_ID'/" app.yaml
+  sed -i.bak "s|value: 'placeholder-sample-trace-id'|value: '$SAMPLE_TRACE_ID'|" app.yaml
   rm -f app.yaml.bak
 fi
 
 if [ -n "$PROMPT_ALIAS" ]; then
   echo "🔧 Setting PROMPT_ALIAS to $PROMPT_ALIAS in app.yaml..."
-  sed -i.bak "s/value: 'placeholder-prompt-alias'/value: '$PROMPT_ALIAS'/" app.yaml
+  sed -i.bak "s|value: 'placeholder-prompt-alias'|value: '$PROMPT_ALIAS'|" app.yaml
   rm -f app.yaml.bak
 fi
 
 if [ -n "$REGRESSION_BASELINE_RUN_ID" ]; then
   echo "🔧 Setting REGRESSION_BASELINE_RUN_ID to $REGRESSION_BASELINE_RUN_ID in app.yaml..."
-  sed -i.bak "s/value: 'placeholder-regression-baseline-run-id'/value: '$REGRESSION_BASELINE_RUN_ID'/" app.yaml
+  sed -i.bak "s|value: 'placeholder-regression-baseline-run-id'|value: '$REGRESSION_BASELINE_RUN_ID'|" app.yaml
   rm -f app.yaml.bak
 fi
 
 if [ -n "$FIX_QUALITY_BASELINE_RUN_ID" ]; then
   echo "🔧 Setting FIX_QUALITY_BASELINE_RUN_ID to $FIX_QUALITY_BASELINE_RUN_ID in app.yaml..."
-  sed -i.bak "s/value: 'placeholder-fix-quality-baseline-run-id'/value: '$FIX_QUALITY_BASELINE_RUN_ID'/" app.yaml
+  sed -i.bak "s|value: 'placeholder-fix-quality-baseline-run-id'|value: '$FIX_QUALITY_BASELINE_RUN_ID'|" app.yaml
   rm -f app.yaml.bak
 fi
 
@@ -259,6 +259,62 @@ databricks apps deploy $DATABRICKS_APP_NAME \
 echo ""
 echo "🎉 Deployment completed!"
 echo ""
+
+# Grant UC permissions to the app's service principal
+if [ -n "$UC_CATALOG" ] && [ -n "$UC_SCHEMA" ]; then
+  echo "🔐 Granting UC permissions to app service principal..."
+  uv run python -c "
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.catalog import Privilege, SecurableType, PermissionsChange
+import os
+
+w = WorkspaceClient()
+app_name = os.environ['DATABRICKS_APP_NAME']
+catalog = os.environ['UC_CATALOG']
+schema = os.environ['UC_SCHEMA']
+
+# Get the app's service principal
+app = w.apps.get(app_name)
+sp_name = getattr(app, 'service_principal_name', None)
+if not sp_name:
+    print('⚠️  Could not find service principal for app, skipping UC grants')
+    exit(0)
+
+# Resolve display name to application_id
+sp_id = None
+for sp in w.service_principals.list(filter=f'displayName eq \"{sp_name}\"'):
+    if sp.display_name == sp_name:
+        sp_id = sp.application_id
+        break
+
+principal = sp_id or sp_name
+print(f'   Found app service principal: {principal}')
+
+# Grant ALL_PRIVILEGES on catalog
+try:
+    w.grants.update(
+        securable_type=SecurableType.CATALOG,
+        full_name=catalog,
+        changes=[PermissionsChange(add=[Privilege.ALL_PRIVILEGES], principal=principal)],
+    )
+    print(f'   ✅ Granted ALL_PRIVILEGES on catalog {catalog}')
+except Exception as e:
+    print(f'   ⚠️  Catalog grant failed: {e}')
+
+# Grant ALL_PRIVILEGES on schema
+try:
+    w.grants.update(
+        securable_type=SecurableType.SCHEMA,
+        full_name=f'{catalog}.{schema}',
+        changes=[PermissionsChange(add=[Privilege.ALL_PRIVILEGES], principal=principal)],
+    )
+    print(f'   ✅ Granted ALL_PRIVILEGES on schema {catalog}.{schema}')
+except Exception as e:
+    print(f'   ⚠️  Schema grant failed: {e}')
+
+print('🔐 UC permission grants complete')
+" || echo "⚠️  UC permission grant step failed (non-blocking)"
+fi
 
 # Get app status and URL
 echo "📊 Checking app status..."
