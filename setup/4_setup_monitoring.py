@@ -21,12 +21,8 @@ if not os.environ.get('MLFLOW_TRACING_SQL_WAREHOUSE_ID') and os.environ.get('SQL
   os.environ['MLFLOW_TRACING_SQL_WAREHOUSE_ID'] = os.environ['SQL_WAREHOUSE_ID']
 
 
-
-from mlflow_demo.evaluation.evaluator import SCORERS
-from mlflow.genai.scorers import ScorerSamplingConfig
-from mlflow.genai.scorers import get_scorer, delete_scorer
-
-# UNCOMMENT THIS
+from mlflow.genai.scorers import Guidelines, RetrievalGroundedness, ScorerSamplingConfig
+from mlflow.genai.scorers import delete_scorer
 
 import logging
 logging.getLogger("urllib3").setLevel(logging.ERROR)
@@ -65,17 +61,67 @@ if SQL_WAREHOUSE_ID and MLFLOW_EXPERIMENT_ID:
 else:
   print('⚠️  SQL_WAREHOUSE_ID or MLFLOW_EXPERIMENT_ID not set, skipping monitoring setup')
 
-for scorer in SCORERS:
+# Use built-in scorers instead of custom @scorer functions so they can be
+# registered and started remotely (outside the Databricks workspace).
+MONITORING_SCORERS = [
+  Guidelines(
+    name='tone',
+    guidelines='The response maintains a professional tone.',
+  ),
+  Guidelines(
+    name='accuracy',
+    guidelines=[
+      'All factual information must be directly sourced from the provided data with NO fabrication',
+      'Names, dates, numbers, and company details must be 100% accurate with no errors',
+      'Meeting discussions must be summarized with the exact same sentiment and priority as presented in the data',
+      'Support ticket information must include correct ticket IDs, status, and resolution details when available',
+      'All product usage statistics must be presented with the same metrics provided in the data',
+      'No references to CloudFlow features, services, or offerings unless specifically mentioned in the customer data',
+    ],
+  ),
+  Guidelines(
+    name='personalized',
+    guidelines=[
+      'Email must begin by referencing the most recent meeting or interaction',
+      'Email must address the customer\'s most pressing concern as evidenced in the data',
+      'Content structure must be customized based on the account\'s health status (critical issues first for Fair or Poor accounts)',
+      'Industry-specific language must be used that reflects the customer\'s sector',
+      'Recommendations must only reference features that are listed as least_used_features and directly related to the potential_opportunity field',
+      'Relationship history must be acknowledged (new vs. mature relationship)',
+      'Deal stage must influence communication approach (implementation vs. renewal vs. growth)',
+    ],
+  ),
+  Guidelines(
+    name='relevance',
+    guidelines=[
+      'Critical support tickets must be addressed early in the email after the greeting and pleasantries',
+      'Time-sensitive action items must be addressed before general updates',
+      'Content must be ordered by descending urgency: critical issues, action items, upcoming renewals, resolved issues, then usage trends',
+      'No more than one feature recommendation for accounts with open critical issues',
+      'No mentions of company news, product releases, or success stories not directly requested by the customer',
+      'No calls to action unrelated to the immediate needs in the data',
+    ],
+  ),
+  RetrievalGroundedness(name='email_is_grounded'),
+]
+
+for scorer in MONITORING_SCORERS:
   # Register each scorer with MLflow
   try:
     scorer.register()
+    print(f'✅ Registered scorer: {scorer.name}')
   except Exception as e:
-    print(f'⚠️ Warning: Scorer {scorer.name} registration failed or already exists: {e}')
-    print('   Attempting to re-register by deleting existing scorer...')
-    delete_scorer(name=scorer.name)
-    scorer.register()
+    print(f'⚠️  Scorer {scorer.name} registration failed or already exists: {e}')
+    print(f'   Attempting to re-register by deleting existing scorer...')
+    try:
+      delete_scorer(name=scorer.name)
+      scorer.register()
+      print(f'✅ Re-registered scorer: {scorer.name}')
+    except Exception as e2:
+      print(f'❌ Failed to re-register scorer {scorer.name}: {e2}')
+      continue
 
   scorer.start(sampling_config=ScorerSamplingConfig(sample_rate=1))
+  print(f'✅ Started scorer: {scorer.name} (sample_rate=1)')
 
-
-
+print('\n✅ Monitoring setup complete!')
