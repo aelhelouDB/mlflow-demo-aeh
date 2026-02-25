@@ -43,12 +43,17 @@ async def get_original_prompt():
 async def get_current_production_prompt():
   """Get the current production prompt template for evaluation."""
   PROMPT_NAME, PROMPT_ALIAS = validate_env_vars()
-  baseline_prompt = mlflow.genai.load_prompt(
-    f'prompts:/{UC_CATALOG}.{UC_SCHEMA}.{PROMPT_NAME}@{PROMPT_ALIAS}'
-  )
-  prompt_as_string = baseline_prompt.template.replace('\\n', '\n')
-  prompt_as_string = prompt_as_string[1:-1]
-  return {'prompt': prompt_as_string}
+  try:
+    baseline_prompt = mlflow.genai.load_prompt(
+      f'prompts:/{UC_CATALOG}.{UC_SCHEMA}.{PROMPT_NAME}@{PROMPT_ALIAS}'
+    )
+    prompt_as_string = baseline_prompt.template.replace('\\n', '\n')
+    prompt_as_string = prompt_as_string[1:-1]
+    return {'prompt': prompt_as_string}
+  except Exception as e:
+    if 'PERMISSION_DENIED' in str(e):
+      return {'prompt': FIXED_PROMPT_TEMPLATE, 'fallback': True}
+    raise
 
 
 # from databricks.sdk import WorkspaceClient

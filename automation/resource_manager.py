@@ -435,7 +435,7 @@ class DatabricksResourceManager:
         permissions: List of permissions to grant
     """
     if permissions is None:
-      permissions = ['ALL_PRIVILEGES', 'MANAGE']
+      permissions = ['USE SCHEMA', 'CREATE FUNCTION', 'EXECUTE', 'MANAGE']
 
     try:
       print(f"🔐 Granting permissions on schema '{schema_full_name}' to '{principal}'...")

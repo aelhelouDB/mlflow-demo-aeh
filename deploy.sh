@@ -265,55 +265,93 @@ if [ -n "$UC_CATALOG" ] && [ -n "$UC_SCHEMA" ]; then
   echo "🔐 Granting UC permissions to app service principal..."
   uv run python -c "
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service.catalog import Privilege, SecurableType, PermissionsChange
+from databricks.sdk.service.ml import ExperimentAccessControlRequest, ExperimentPermissionLevel
 import os
 
 w = WorkspaceClient()
 app_name = os.environ['DATABRICKS_APP_NAME']
 catalog = os.environ['UC_CATALOG']
 schema = os.environ['UC_SCHEMA']
+warehouse_id = os.environ.get('SQL_WAREHOUSE_ID')
+experiment_id = os.environ.get('MLFLOW_EXPERIMENT_ID')
 
 # Get the app's service principal
 app = w.apps.get(app_name)
 sp_name = getattr(app, 'service_principal_name', None)
-if not sp_name:
-    print('⚠️  Could not find service principal for app, skipping UC grants')
+sp_client_id = getattr(app, 'service_principal_client_id', None)
+if not sp_name and not sp_client_id:
+    print('⚠️  Could not find service principal for app, skipping grants')
     exit(0)
 
-# Resolve display name to application_id
-sp_id = None
-for sp in w.service_principals.list(filter=f'displayName eq \"{sp_name}\"'):
-    if sp.display_name == sp_name:
-        sp_id = sp.application_id
-        break
+principal = sp_client_id or sp_name
+print(f'   App service principal: {sp_name} (client_id: {sp_client_id})')
 
-principal = sp_id or sp_name
-print(f'   Found app service principal: {principal}')
+# --- UC Catalog & Schema Grants ---
+if warehouse_id:
+    # Use SQL GRANT statements (more reliable than SDK grants.update which has enum serialization issues)
+    # Prompts are stored as UC functions, so the SP needs explicit function-level privileges
+    grants = [
+        f'GRANT USE CATALOG ON CATALOG \`{catalog}\` TO \`{principal}\`',
+        f'GRANT USE SCHEMA ON SCHEMA \`{catalog}\`.\`{schema}\` TO \`{principal}\`',
+        f'GRANT CREATE FUNCTION ON SCHEMA \`{catalog}\`.\`{schema}\` TO \`{principal}\`',
+        f'GRANT EXECUTE ON SCHEMA \`{catalog}\`.\`{schema}\` TO \`{principal}\`',
+        f'GRANT MANAGE ON SCHEMA \`{catalog}\`.\`{schema}\` TO \`{principal}\`',
+    ]
+    for sql in grants:
+        try:
+            result = w.statement_execution.execute_statement(
+                warehouse_id=warehouse_id, statement=sql, wait_timeout='30s',
+            )
+            state = result.status.state.value if result.status and result.status.state else 'UNKNOWN'
+            if state == 'SUCCEEDED':
+                target = sql.split(' ON ')[1].split(' TO ')[0]
+                print(f'   ✅ Granted {target}')
+            else:
+                error_msg = getattr(result.status, 'error', None)
+                print(f'   ⚠️  Grant returned {state}: {error_msg}')
+        except Exception as e:
+            print(f'   ⚠️  SQL grant failed: {e}')
+else:
+    # Fallback to SDK grants API with string securable types
+    # Prompts are stored as UC functions, so the SP needs explicit function-level privileges
+    from databricks.sdk.service.catalog import PermissionsChange, Privilege
+    sdk_grants = [
+        ('catalog', catalog, [Privilege.USE_CATALOG]),
+        ('schema', f'{catalog}.{schema}', [Privilege.USE_SCHEMA, Privilege.CREATE_FUNCTION, Privilege.EXECUTE, Privilege.MANAGE]),
+    ]
+    for securable_type, full_name, privileges in sdk_grants:
+        try:
+            w.grants.update(
+                securable_type=securable_type,
+                full_name=full_name,
+                changes=[PermissionsChange(add=privileges, principal=principal)],
+            )
+            priv_names = [p.value for p in privileges]
+            print(f'   ✅ Granted {priv_names} on {securable_type} {full_name}')
+        except Exception as e:
+            print(f'   ⚠️  {securable_type} grant failed: {e}')
 
-# Grant ALL_PRIVILEGES on catalog
-try:
-    w.grants.update(
-        securable_type=SecurableType.CATALOG,
-        full_name=catalog,
-        changes=[PermissionsChange(add=[Privilege.ALL_PRIVILEGES], principal=principal)],
-    )
-    print(f'   ✅ Granted ALL_PRIVILEGES on catalog {catalog}')
-except Exception as e:
-    print(f'   ⚠️  Catalog grant failed: {e}')
+# --- MLflow Experiment Permission ---
+# CAN_MANAGE is required for the app SP to load/update prompts in the prompt registry
+if experiment_id:
+    try:
+        w.experiments.set_permissions(
+            experiment_id=experiment_id,
+            access_control_list=[
+                ExperimentAccessControlRequest(
+                    service_principal_name=principal,
+                    permission_level=ExperimentPermissionLevel.CAN_MANAGE,
+                ),
+            ],
+        )
+        print(f'   ✅ Granted CAN_MANAGE on experiment {experiment_id}')
+    except Exception as e:
+        print(f'   ⚠️  Experiment permission grant failed: {e}')
+else:
+    print('   ⚠️  MLFLOW_EXPERIMENT_ID not set, skipping experiment permissions')
 
-# Grant ALL_PRIVILEGES on schema
-try:
-    w.grants.update(
-        securable_type=SecurableType.SCHEMA,
-        full_name=f'{catalog}.{schema}',
-        changes=[PermissionsChange(add=[Privilege.ALL_PRIVILEGES], principal=principal)],
-    )
-    print(f'   ✅ Granted ALL_PRIVILEGES on schema {catalog}.{schema}')
-except Exception as e:
-    print(f'   ⚠️  Schema grant failed: {e}')
-
-print('🔐 UC permission grants complete')
-" || echo "⚠️  UC permission grant step failed (non-blocking)"
+print('🔐 Permission grants complete')
+" || echo "⚠️  Permission grant step failed (non-blocking)"
 fi
 
 # Get app status and URL

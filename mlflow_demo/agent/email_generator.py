@@ -205,10 +205,24 @@ class EmailGenerator:
     try:
       self.prompt = mlflow.genai.load_prompt(prompt_uri)
     except Exception as e:
-      # If loading fails due to permissions, log detailed error
-      print(f'Error loading prompt from {prompt_uri}: {e}')
+      # If loading fails due to permissions, fall back to local prompt template
+      print(f'Warning: Could not load prompt from {prompt_uri}: {e}')
       print(f'Error type: {type(e).__name__}')
-      raise
+      if 'PERMISSION_DENIED' in str(e):
+        from mlflow_demo.agent.prompts import FIXED_PROMPT_TEMPLATE
+
+        print('Falling back to local FIXED_PROMPT_TEMPLATE')
+
+        class _FallbackPrompt:
+          """Minimal prompt object matching the interface of mlflow.genai.load_prompt result."""
+
+          def __init__(self, template, version='local'):
+            self.template = template
+            self.version = version
+
+        self.prompt = _FallbackPrompt(template=FIXED_PROMPT_TEMPLATE)
+      else:
+        raise
 
     # Set the active MLflow model to track the specific prompt version in traces
     # This enables tracking which prompt version was used for each generation

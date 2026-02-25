@@ -1459,20 +1459,21 @@ class AutoSetup:
       if service_principal:
         print(f'✅ Found app service principal: {service_principal}')
 
-        # Grant ALL_PRIVILEGES on catalog (needed for prompt creation and UC trace tables)
+        # Grant USE CATALOG on catalog
         catalog_name = self.config['UC_CATALOG']
         print(f'🔐 Granting catalog permissions on {catalog_name}...')
         self.resource_manager.grant_catalog_permissions(
-          catalog_name, service_principal, permissions=['ALL_PRIVILEGES']
+          catalog_name, service_principal, permissions=['USE CATALOG']
         )
 
-        # Grant ALL_PRIVILEGES on schema for prompt lifecycle management and UC trace tables
+        # Grant schema permissions needed for prompt registry (prompts are stored as UC functions)
+        # and UC trace tables: USE SCHEMA, CREATE FUNCTION, EXECUTE, MANAGE
         schema_name = f'{self.config["UC_CATALOG"]}.{self.config["UC_SCHEMA"]}'
         print(f'🔐 Granting schema permissions on {schema_name}...')
         self.resource_manager.grant_schema_permissions(
           schema_name,
           service_principal,
-          permissions=['ALL_PRIVILEGES'],
+          permissions=['USE SCHEMA', 'CREATE FUNCTION', 'EXECUTE', 'MANAGE'],
         )
 
         # Grant experiment permissions (CAN MANAGE)
