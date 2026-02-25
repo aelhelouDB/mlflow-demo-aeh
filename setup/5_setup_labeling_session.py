@@ -12,7 +12,7 @@ dotenv.load_dotenv(project_root / '.env.local')
 
 # allow databricks-cli auth to take over
 import os
-os.environ.pop('DATABRICKS_HOST', None)
+os.environ.pop('DATABRICKS_TOKEN', None)
 
 
 import logging

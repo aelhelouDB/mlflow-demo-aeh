@@ -15,8 +15,9 @@ import dotenv
 # Load environment variables from .env.local in project root
 dotenv.load_dotenv(project_root / '.env.local')
 
-# allow databricks-cli auth to take over
-os.environ.pop('DATABRICKS_HOST', None)
+# allow databricks-cli auth to take over (remove token so profile/CLI auth is used,
+# but keep DATABRICKS_HOST so MLflow can resolve the 'databricks' tracking URI)
+os.environ.pop('DATABRICKS_TOKEN', None)
 
 # Disable async trace logging so traces are committed synchronously before we search them.
 os.environ['MLFLOW_ENABLE_ASYNC_TRACE_LOGGING'] = 'false'

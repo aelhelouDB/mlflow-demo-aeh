@@ -10,9 +10,10 @@ import dotenv
 # Load environment variables from .env.local in project root
 dotenv.load_dotenv(project_root / '.env.local')
 
-# allow databricks-cli auth to take over
+# allow databricks-cli auth to take over (remove token so profile/CLI auth is used,
+# but keep DATABRICKS_HOST so MLflow can resolve the 'databricks' tracking URI)
 import os
-os.environ.pop('DATABRICKS_HOST', None)
+os.environ.pop('DATABRICKS_TOKEN', None)
 
 # MLflow requires MLFLOW_TRACING_SQL_WAREHOUSE_ID when writing traces to UC-backed experiments.
 # Bridge from SQL_WAREHOUSE_ID if not explicitly set.
