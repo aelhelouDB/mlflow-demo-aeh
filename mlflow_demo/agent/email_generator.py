@@ -159,6 +159,9 @@ class EmailGenerator:
     self.uc_schema = uc_schema or os.environ.get('UC_SCHEMA')
     self.prompt_name = prompt_name or os.getenv('PROMPT_NAME')
     self.prompt = None
+    self.prompt_uri = (
+      f'prompts:/{self.uc_catalog}.{self.uc_schema}.{self.prompt_name}@{self.prompt_alias}'
+    )
 
     # Validate required configuration
     if not self.model:
@@ -176,7 +179,7 @@ class EmailGenerator:
     w = WorkspaceClient()  # Auto-configures from environment or ~/.databrickscfg
     self.openai_client = w.serving_endpoints.get_open_ai_client()
 
-    # Load prompt
+    # Load prompt (initial validation - linkage to traces happens in traced functions)
     self._load_prompt()
 
   def _load_prompt(self):
@@ -198,15 +201,11 @@ class EmailGenerator:
     """
     # Load prompt from registry using the prompts:// URI format
     # Format: prompts:/{catalog}.{schema}.{prompt_name}@{alias}
-    prompt_uri = (
-      f'prompts:/{self.uc_catalog}.{self.uc_schema}.{self.prompt_name}@{self.prompt_alias}'
-    )
-
     try:
-      self.prompt = mlflow.genai.load_prompt(prompt_uri)
+      self.prompt = mlflow.genai.load_prompt(self.prompt_uri)
     except Exception as e:
       # If loading fails due to permissions, fall back to local prompt template
-      print(f'Warning: Could not load prompt from {prompt_uri}: {e}')
+      print(f'Warning: Could not load prompt from {self.prompt_uri}: {e}')
       print(f'Error type: {type(e).__name__}')
       if 'PERMISSION_DENIED' in str(e):
         from mlflow_demo.agent.prompts import FIXED_PROMPT_TEMPLATE
@@ -645,8 +644,10 @@ class EmailGenerator:
         - Delegates actual streaming to _stream_generate_email method
         - Primary implementation used by both streaming and non-streaming APIs
     """
-    # Load the prompt and set the active MLflow model
-    self._load_prompt()
+    # Load prompt directly within traced function for automatic prompt-trace linkage.
+    # MLflow auto-links prompts to the active trace when load_prompt() is called
+    # inside a @mlflow.trace-decorated function.
+    self.prompt = mlflow.genai.load_prompt(self.prompt_uri)
 
     # Retrieve customer data using MLflow RETRIEVER span
     customer_data = self._retrieve_customer_data(customer_name)
