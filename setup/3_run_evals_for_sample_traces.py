@@ -11,8 +11,9 @@ import dotenv
 # Load environment variables from .env.local in project root
 dotenv.load_dotenv(project_root / '.env.local')
 
-# allow databricks-cli auth to take over
-os.environ.pop('DATABRICKS_HOST', None)
+# allow databricks-cli auth to take over (remove token so profile/CLI auth is used,
+# but keep DATABRICKS_HOST so MLflow can resolve the 'databricks' tracking URI)
+os.environ.pop('DATABRICKS_TOKEN', None)
 
 # MLflow requires MLFLOW_TRACING_SQL_WAREHOUSE_ID when writing traces to UC-backed experiments.
 # Bridge from SQL_WAREHOUSE_ID if not explicitly set.
@@ -68,15 +69,16 @@ from mlflow_demo.utils.mlflow_helpers import get_mlflow_experiment_id, ensure_ht
 
 def run_single_evaluation(dataset_name, prompt_alias, eval_run_name):
   dataset = mlflow.genai.datasets.get_dataset(
-      uc_table_name=f'{UC_CATALOG}.{UC_SCHEMA}.{dataset_name}',
+      name=f'{UC_CATALOG}.{UC_SCHEMA}.{dataset_name}',
     )
 
   generator_new = EmailGenerator(prompt_alias=prompt_alias)
   # Disable autolog again - EmailGenerator.__init__ re-enables it
   mlflow.openai.autolog(disable=True)
 
-  def predict_fn_new(customer_name: str , user_input: str) -> Dict[str, Any]:
-      return generator_new.generate_email_with_retrieval(customer_name, user_input)
+  def predict_fn_new(request: str) -> Dict[str, Any]:
+      parsed = json.loads(request) if isinstance(request, str) else request
+      return generator_new.generate_email_with_retrieval(parsed['customer_name'], parsed.get('user_input', ''))
 
   # Run evaluations
   print('Running evaluation...')
@@ -447,33 +449,29 @@ def run_new_prompt_eval():
     raise Exception('No result URL found')
 
 def add_traces_to_run(run_id: str, trace_ids: list[str]):
-  w._api_client.do(
-    'POST',
-    '/api/2.0/mlflow/traces/link-to-run',
-    body={'run_id': run_id, 'trace_ids': trace_ids},
-  )
+  client.link_traces_to_run(trace_ids=trace_ids, run_id=run_id)
 
 
 def create_and_add_fix_quality_dataset():
   uc_table_name = f'{UC_CATALOG}.{UC_SCHEMA}.{FIX_DATASET_NAME}'
   try:
-    dataset = get_dataset(uc_table_name=uc_table_name)
+    dataset = get_dataset(name=uc_table_name)
   except Exception:
-    dataset = create_dataset(uc_table_name=uc_table_name)
+    dataset = create_dataset(name=uc_table_name)
   traces = mlflow.search_traces(filter_string='tags.eval_example = "yes"')
   dataset.merge_records(traces)
-  return get_dataset(uc_table_name=uc_table_name)
+  return get_dataset(name=uc_table_name)
 
 
 def create_and_add_dataset_regression():
   uc_table_name = f'{UC_CATALOG}.{UC_SCHEMA}.{REGRESSION_DATASET_NAME}'
   try:
-    dataset = get_dataset(uc_table_name=uc_table_name)
+    dataset = get_dataset(name=uc_table_name)
   except Exception:
-    dataset = create_dataset(uc_table_name=uc_table_name)
+    dataset = create_dataset(name=uc_table_name)
   traces = mlflow.search_traces(filter_string='tags.eval_example = "regression"')
   dataset.merge_records(traces)
-  return get_dataset(uc_table_name=uc_table_name)
+  return get_dataset(name=uc_table_name)
 
 
 def make_eval_datasets_and_baseline_runs_for_prompt_test():
@@ -487,28 +485,36 @@ def make_eval_datasets_and_baseline_runs_for_prompt_test():
 
   print('Finding traces for eval and regression datasets...')
   for trace in traces:
-    number_passes = 0
     if len(trace.info.assessments) == 0:
       print(f'no assessments for {trace.info.trace_id}, deleting it')
-      # print(trace.info.experiment_id)
       client.delete_traces(experiment_id=trace.info.experiment_id, trace_ids=[trace.info.trace_id])
-    is_bad_example = False
+      continue
+
+    # Use the latest non-empty assessment per scorer name
+    latest_assessments = {}
     for assessment in trace.info.assessments:
-      if assessment.name == 'accuracy' and assessment.feedback.value == 'no':
-        if len(failed_accuracy) < 5:
-          failed_accuracy.append(trace.info.trace_id)
-          is_bad_example = True
-          # print(f'failed accuracy: {trace.info.trace_id}')
-      elif assessment.name == 'relevance' and assessment.feedback.value == 'yes':
-        number_passes += 1
-      elif assessment.name == 'personalized' and assessment.feedback.value == 'yes':
-        number_passes += 1
-      elif assessment.name == 'accuracy' and assessment.feedback.value == 'yes':
-        number_passes += 1
+      if assessment.name in ('accuracy', 'relevance', 'personalized'):
+        if assessment.feedback.value:  # skip empty string assessments
+          latest_assessments[assessment.name] = assessment.feedback.value
+
+    is_bad_example = False
+    number_passes = 0
+
+    if latest_assessments.get('accuracy') == 'no':
+      is_bad_example = True
+      if trace.info.trace_id not in failed_accuracy and len(failed_accuracy) < 5:
+        failed_accuracy.append(trace.info.trace_id)
+
+    if latest_assessments.get('relevance') == 'yes':
+      number_passes += 1
+    if latest_assessments.get('personalized') == 'yes':
+      number_passes += 1
+    if latest_assessments.get('accuracy') == 'yes':
+      number_passes += 1
+
     if number_passes >= 2 and not is_bad_example:
-      if len(passed_all) < 5:
+      if trace.info.trace_id not in passed_all and len(passed_all) < 5:
         passed_all.append(trace.info.trace_id)
-        # print(f'passed all: {trace.info.trace_id}')
 
   print(
     f'Found {len(failed_accuracy)} traces for low accuracy and {len(passed_all)} traces for regression, adding tags'
