@@ -130,14 +130,19 @@ def create_labeling_session(schemas, session_name='email_evaluation_session'):
 def add_traces_to_session(session):
   """Add traces to a labeling session and return trace IDs."""
   # Normally, you would query for the relevant traces, here we just grab 3.
-  traces = mlflow.search_traces(max_results=3)
-  session.add_traces(traces)
-  
+  traces = mlflow.search_traces(max_results=3, return_type='list')
+
+  try:
+    session.add_traces(traces)
+  except Exception as e:
+    # The rag_eval library's internal link_traces_to_run REST call does not
+    # support UC-backed traces. Fall back to just recording the first trace ID.
+    print(f'⚠️  add_traces failed (expected for UC-backed traces run locally): {e}')
+    print('   Traces can be added from the Review App UI or a Databricks notebook.')
+
   # Return the first trace ID for the UI to use
-  if not traces.empty:
-    # Get the first trace ID from the DataFrame
-    first_trace_id = traces.iloc[0]['trace_id']
-    return first_trace_id
+  if traces:
+    return traces[0].info.trace_id
   return None
 
 
