@@ -162,9 +162,16 @@ export function EmailGenerator({
               } else if (data.type === "done" && data.trace_id) {
                 setCurrentTraceId(data.trace_id);
                 onTraceIdGenerated?.(data.trace_id);
-                // Parse the final email
+                // Parse the final email (clean markdown code block markers if present)
                 try {
-                  const emailJson = JSON.parse(accumulatedContent);
+                  let cleanContent = accumulatedContent.trim();
+                  if (cleanContent.startsWith("```json\n") && cleanContent.endsWith("\n```")) {
+                    cleanContent = cleanContent.slice("```json\n".length, -"\n```".length);
+                  } else if (cleanContent.startsWith("```") && cleanContent.endsWith("```")) {
+                    cleanContent = cleanContent.slice(3, -3);
+                  }
+                  cleanContent = cleanContent.trim();
+                  const emailJson = JSON.parse(cleanContent);
                   setGeneratedEmail(emailJson);
                 } catch (e) {
                   console.error("Failed to parse email JSON:", e);
